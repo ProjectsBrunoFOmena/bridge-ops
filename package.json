@@ -1,0 +1,13 @@
+{
+  "name": "portal-excecoes-mvp",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "dev:erp": "pnpm --filter erp-mock dev",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm -r build"
+  }
+}

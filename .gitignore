@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.pnpm-store/
+.env
+*.log
+coverage/
+.DS_Store
+metodo.md
+Proj_tec.md

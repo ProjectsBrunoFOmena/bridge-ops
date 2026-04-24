@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: portal-excecoes-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/db/migrations:/docker-entrypoint-initdb.d/01-migrations
+      - ./infra/db/seeds:/docker-entrypoint-initdb.d/02-seeds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  erp-mock:
+    build:
+      context: .
+      dockerfile: ./services/erp-mock/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${ERP_MOCK_PORT}:3001"
+
+  api:
+    build:
+      context: .
+      dockerfile: ./services/api/Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      erp-mock:
+        condition: service_started
+    ports:
+      - "${API_PORT}:3000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./services/worker/Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      erp-mock:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: ./services/web/Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "${WEB_PORT}:5173"
+
+volumes:
+  postgres_data:
