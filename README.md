@@ -111,12 +111,27 @@ Também deve existir modo de indisponibilidade temporária (`503` por N segundos
 
 ## Credenciais de demo
 
-Definir em seed/configuração do projeto:
+Definidas no seed inicial (`infra/db/seeds/001_demo_users.sql`):
 
-- `viewer` (somente leitura)
-- `operator` (triagem e reprocesso)
+- `viewer@demo.local` / `viewer123`
+- `operator@demo.local` / `operator123`
 
-> Preencher aqui os usuários e senhas reais do ambiente local.
+## Estrutura inicial implementada
+
+```
+.
+├─ infra/
+│  └─ db/
+│     ├─ migrations/001_init.sql
+│     └─ seeds/001_demo_users.sql
+├─ services/
+│  ├─ api/       # contexto orders + endpoints integration iniciais
+│  ├─ worker/    # processamento assíncrono outbox + retries
+│  ├─ erp-mock/  # simulador com falhas configuráveis
+│  └─ web/       # frontend React (fundação)
+├─ docker-compose.yml
+└─ .env.example
+```
 
 ## Fluxo de demonstração (5 minutos)
 
