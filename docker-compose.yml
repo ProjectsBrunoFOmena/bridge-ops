@@ -10,8 +10,8 @@ services:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/db/migrations:/docker-entrypoint-initdb.d/01-migrations
-      - ./infra/db/seeds:/docker-entrypoint-initdb.d/02-seeds
+      - ./infra/db/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - ./infra/db/seeds/001_demo_users.sql:/docker-entrypoint-initdb.d/002_demo_users.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
