@@ -5,9 +5,7 @@ RUN corepack enable
 
 COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY services/worker/package.json ./services/worker/package.json
-RUN pnpm install --filter worker... --frozen-lockfile=false
-
 COPY services/worker ./services/worker
-WORKDIR /app/services/worker
+RUN pnpm install --frozen-lockfile=false
 
-CMD ["pnpm", "dev"]
+CMD ["pnpm", "--filter", "worker", "dev"]
