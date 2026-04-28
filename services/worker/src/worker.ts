@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 
 const pool = new Pool({
-  host: "db",
+  host: process.env.POSTGRES_HOST ?? "db",
   port: Number(process.env.POSTGRES_PORT ?? 5432),
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
@@ -13,7 +13,7 @@ const MAX_RETRIES = Number(process.env.MAX_RETRIES ?? 3);
 const RETRY_INTERVAL_SECONDS = Number(process.env.RETRY_INTERVAL_SECONDS ?? 20);
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS ?? 5000);
 
-async function processOneEvent(): Promise<void> {
+export async function processOneEvent(): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -159,8 +159,14 @@ async function processOneEvent(): Promise<void> {
   }
 }
 
-setInterval(() => {
-  void processOneEvent();
-}, POLL_INTERVAL_MS);
+export function startWorker() {
+  setInterval(() => {
+    void processOneEvent();
+  }, POLL_INTERVAL_MS);
 
-console.log("Worker iniciado.");
+  console.log("Worker iniciado.");
+}
+
+if (process.env.NODE_ENV !== "test") {
+  startWorker();
+}
