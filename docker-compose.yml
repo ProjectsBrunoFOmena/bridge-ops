@@ -57,8 +57,12 @@ services:
     build:
       context: .
       dockerfile: ./services/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
     env_file:
       - .env
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
     depends_on:
       api:
         condition: service_started

@@ -76,6 +76,42 @@ async function processOneEvent(): Promise<void> {
         [attempt.rows[0].id, response.status, JSON.stringify(responseBody)]
       );
       await client.query("UPDATE orders SET status = 'integrado', updated_at = NOW() WHERE id = $1", [orderId]);
+
+      if (event.event_type === "order.reprocess") {
+        const resolvedExceptionResult = await client.query(
+          `WITH target AS (
+             SELECT id
+             FROM exceptions
+             WHERE order_id = $1 AND status IN ('aberta', 'em_analise')
+             ORDER BY created_at DESC
+             LIMIT 1
+           )
+           UPDATE exceptions e
+           SET status = 'resolvida',
+               resolved_at = NOW(),
+               locked_by = NULL,
+               locked_at = NULL,
+               updated_at = NOW(),
+               lock_version = lock_version + 1
+           FROM target
+           WHERE e.id = target.id
+           RETURNING e.id, e.status, e.resolved_at`,
+          [orderId]
+        );
+
+        if (resolvedExceptionResult.rowCount && resolvedExceptionResult.rows[0]) {
+          await client.query(
+            `INSERT INTO audit_logs (entity_type, entity_id, action, actor_role, correlation_id, after_data)
+             VALUES ('exception', $1, 'resolved_by_reprocess_success', 'system', $2, $3::jsonb)`,
+            [
+              resolvedExceptionResult.rows[0].id,
+              event.correlation_id,
+              JSON.stringify(resolvedExceptionResult.rows[0])
+            ]
+          );
+        }
+      }
+
       await client.query("UPDATE outbox_events SET status = 'done', processed_at = NOW() WHERE id = $1", [event.id]);
       await client.query("COMMIT");
       return;

@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyError } from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import swagger from "@fastify/swagger";
@@ -34,7 +34,7 @@ app.addHook("onRequest", async (req) => {
   req.headers["x-correlation-id"] = req.headers["x-correlation-id"] ?? randomUUID();
 });
 
-app.setErrorHandler((error, req, reply) => {
+app.setErrorHandler((error: FastifyError, req, reply) => {
   reply.status(error.statusCode ?? 500).type("application/problem+json").send({
     type: "about:blank",
     title: error.name,
@@ -194,7 +194,7 @@ app.get("/exceptions", async (req) => {
 
   const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
   const rows = await pool.query(
-    `SELECT e.id, e.status, e.error_code, e.error_message, e.created_at, o.reference
+    `SELECT e.id, e.status, e.error_code, e.error_message, e.created_at, e.resolved_at, o.reference
      FROM exceptions e
      JOIN orders o ON o.id = e.order_id
      ${where}
@@ -202,6 +202,108 @@ app.get("/exceptions", async (req) => {
     values
   );
   return rows.rows;
+});
+
+app.get("/exceptions/:id", async (req, reply) => {
+  await req.jwtVerify();
+  const exceptionId = (req.params as { id: string }).id;
+
+  const exceptionResult = await pool.query(
+    `SELECT
+       e.id,
+       e.order_id,
+       e.attempt_id,
+       e.status,
+       e.error_code,
+       e.error_message,
+       e.lock_version,
+       e.locked_by,
+       e.locked_at,
+       e.discard_reason,
+       e.resolved_at,
+       e.created_at,
+       e.updated_at,
+       o.reference,
+       o.status AS order_status,
+       o.total_amount,
+       c.id AS customer_id,
+       c.name AS customer_name,
+       c.document AS customer_document,
+       c.email AS customer_email
+     FROM exceptions e
+     JOIN orders o ON o.id = e.order_id
+     JOIN customers c ON c.id = o.customer_id
+     WHERE e.id = $1`,
+    [exceptionId]
+  );
+
+  if (exceptionResult.rowCount === 0) {
+    return reply.status(404).send({ message: "excecao nao encontrada" });
+  }
+
+  const exceptionRow = exceptionResult.rows[0];
+
+  const [itemsResult, attemptsResult, auditResult] = await Promise.all([
+    pool.query(
+      `SELECT id, sku, quantity, unit_price, created_at
+       FROM order_items
+       WHERE order_id = $1
+       ORDER BY created_at ASC`,
+      [exceptionRow.order_id]
+    ),
+    pool.query(
+      `SELECT
+         id,
+         status,
+         http_status,
+         error_code,
+         error_message,
+         payload_snapshot,
+         response_snapshot,
+         correlation_id,
+         created_at
+       FROM integration_attempts
+       WHERE order_id = $1
+       ORDER BY created_at DESC`,
+      [exceptionRow.order_id]
+    ),
+    pool.query(
+      `SELECT id, action, actor_id, actor_role, correlation_id, before_data, after_data, created_at
+       FROM audit_logs
+       WHERE entity_type = 'exception' AND entity_id = $1
+       ORDER BY created_at DESC`,
+      [exceptionId]
+    )
+  ]);
+
+  return {
+    id: exceptionRow.id,
+    status: exceptionRow.status,
+    error_code: exceptionRow.error_code,
+    error_message: exceptionRow.error_message,
+    lock_version: exceptionRow.lock_version,
+    locked_by: exceptionRow.locked_by,
+    locked_at: exceptionRow.locked_at,
+    discard_reason: exceptionRow.discard_reason,
+    resolved_at: exceptionRow.resolved_at,
+    created_at: exceptionRow.created_at,
+    updated_at: exceptionRow.updated_at,
+    order: {
+      id: exceptionRow.order_id,
+      reference: exceptionRow.reference,
+      status: exceptionRow.order_status,
+      total_amount: exceptionRow.total_amount,
+      customer: {
+        id: exceptionRow.customer_id,
+        name: exceptionRow.customer_name,
+        document: exceptionRow.customer_document,
+        email: exceptionRow.customer_email
+      },
+      items: itemsResult.rows
+    },
+    attempts: attemptsResult.rows,
+    audit_logs: auditResult.rows
+  };
 });
 
 app.post("/exceptions/:id/analyze", async (req, reply) => {
