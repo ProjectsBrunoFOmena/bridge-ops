@@ -5,10 +5,8 @@ RUN corepack enable
 
 COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY services/erp-mock/package.json ./services/erp-mock/package.json
-RUN pnpm install --filter erp-mock... --frozen-lockfile=false
-
 COPY services/erp-mock ./services/erp-mock
-WORKDIR /app/services/erp-mock
+RUN pnpm install --frozen-lockfile=false
 
 EXPOSE 3001
-CMD ["pnpm", "dev"]
+CMD ["pnpm", "--filter", "erp-mock", "dev"]

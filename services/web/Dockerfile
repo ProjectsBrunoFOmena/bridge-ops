@@ -8,10 +8,8 @@ ENV VITE_API_URL=${VITE_API_URL}
 
 COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY services/web/package.json ./services/web/package.json
-RUN pnpm install --filter web... --frozen-lockfile=false
-
 COPY services/web ./services/web
-WORKDIR /app/services/web
+RUN pnpm install --frozen-lockfile=false
 
 EXPOSE 5173
-CMD ["pnpm", "dev"]
+CMD ["pnpm", "--filter", "web", "dev"]
